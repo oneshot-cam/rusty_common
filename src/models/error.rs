@@ -1,4 +1,4 @@
-use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use actix_web::{error::HttpError, http::StatusCode, HttpResponse, ResponseError};
 use image::error::ImageError;
 use log::error;
 use s3::error::S3Error;
@@ -65,15 +65,26 @@ impl ResponseError for ApiError {
 
 impl From<S3Error> for ApiError {
     fn from(value: S3Error) -> Self {
+        dbg!(&value);
         match value.borrow() {
             S3Error::Http(x) => match x.status_code() {
-                StatusCode::NOT_FOUND => return ApiError::NotFound,
-                _ => {
-                    return ApiError::InternalServerError {
+                StatusCode::NOT_FOUND => ApiError::NotFound,
+                _ => ApiError::InternalServerError {
+                    source: Box::new(value),
+                },
+            },
+            S3Error::HttpFail => ApiError::InternalServerError {
+                source: Box::new(value),
+            },
+            S3Error::HttpFailWithBody(statuscode, body) => {
+                if *statuscode == 404 {
+                    ApiError::NotFound
+                } else {
+                    ApiError::InternalServerError {
                         source: Box::new(value),
                     }
                 }
-            },
+            }
             _ => {
                 error!("S3Error: {value}");
                 Self::InternalServerError {
@@ -96,5 +107,20 @@ impl From<ImageError> for ApiError {
     fn from(value: ImageError) -> Self {
         //TODO!
         todo!()
+    }
+}
+
+impl From<HttpError> for ApiError {
+    fn from(value: HttpError) -> Self {
+        match value.status_code().as_u16() {
+            404 => ApiError::NotFound,
+            400 => ApiError::BadRequest,
+            401 => ApiError::Unauthorized,
+            403 => ApiError::Forbidden,
+            // no status code for 'already exists'
+            _ => ApiError::InternalServerError {
+                source: Box::new(value),
+            },
+        }
     }
 }
