@@ -22,6 +22,22 @@ pub enum ApiError {
     InternalServerError { source: Box<dyn ErrorTrait> },
 }
 
+impl From<sqlx::Error> for ApiError {
+    fn from(err: sqlx::Error) -> Self {
+        // 23505 conflict
+        if let sqlx::Error::Database(err) = &err {
+            let err = err.downcast_ref::<sqlx::postgres::PgDatabaseError>();
+            if let "23505" = err.code() {
+                return ApiError::AlreadyExists;
+            }
+        }
+
+        ApiError::InternalServerError {
+            source: Box::new(err),
+        }
+    }
+}
+
 impl From<Box<dyn ErrorTrait>> for ApiError {
     fn from(v: Box<dyn ErrorTrait>) -> Self {
         Self::InternalServerError { source: v }

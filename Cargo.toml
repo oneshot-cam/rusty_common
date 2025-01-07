@@ -14,3 +14,13 @@ thiserror = "1.0.61"
 image = "0.25.1"
 fast_image_resize = { version = "4.0.0", features = ["image"] }
 argon2 = "0.5.3"
+sqlx = { version = "0.8.0", features = [
+    "postgres",
+    "uuid",
+    "chrono",
+    "sqlx-macros",
+    "runtime-tokio",
+    "json",
+    "migrate",
+    "derive",
+] }
